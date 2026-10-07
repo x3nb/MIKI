@@ -6,6 +6,7 @@
 <title>chimera // helix archive &middot; cafedreamr</title>
 <meta name="description" content="recovered experiment index from miki's old machine. eight files. the lab wrote them cold. miki found them anyway.">
 <meta name="theme-color" content="#05080e">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2305080e'/%3E%3Cpath d='M7 12 L11 3 L14 11 Z' fill='%23dfe3ea'/%3E%3Cpath d='M18 11 L21 3 L25 12 Z' fill='%23dfe3ea'/%3E%3Cpath d='M11 6 Q14 11 11 16 Q8 21 11 26' fill='none' stroke='%237fe7e7' stroke-width='2'/%3E%3Cpath d='M21 6 Q18 11 21 16 Q24 21 21 26' fill='none' stroke='%23c9a7ff' stroke-width='2'/%3E%3Cline x1='10' y1='13' x2='22' y2='13' stroke='%23dfe3ea' stroke-width='1' opacity='.6'/%3E%3Cline x1='9' y1='18' x2='23' y2='18' stroke='%23dfe3ea' stroke-width='1' opacity='.6'/%3E%3Cline x1='10' y1='23' x2='22' y2='23' stroke='%23dfe3ea' stroke-width='1' opacity='.6'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -59,6 +60,12 @@ table.meta td.k{width:150px;color:var(--dim);letter-spacing:.12em;text-transform
 .miki .who{font-size:10px;letter-spacing:.24em;color:var(--miki);margin-bottom:4px}
 .red{background:#232936;color:transparent;border-radius:3px;padding:0 5px;cursor:pointer;white-space:nowrap}
 .red.open{color:var(--pale);background:rgba(255,255,255,.07);cursor:default}
+.miki{cursor:pointer}
+.miki .cur{display:inline-block;width:9px;height:15px;background:var(--miki);vertical-align:-2px;margin-left:5px;animation:mpulse 1.1s steps(1) infinite;box-shadow:0 0 8px rgba(204,255,0,.8)}
+@keyframes mpulse{50%{opacity:0}}
+.miki.talking{box-shadow:0 0 20px rgba(204,255,0,.3)}
+.miki.talking .cur{animation-duration:.32s}
+.miki .tap{color:var(--miki);font-size:10px;letter-spacing:.2em}
 .timeline{margin-top:34px;border:1px solid var(--line);padding:16px}
 .timeline h2{font-family:var(--serif);font-size:18px;letter-spacing:.12em;margin:0 0 10px}
 .timeline ol{margin:0;padding-left:20px;font-size:13px;line-height:1.9;color:var(--dim)}
@@ -316,6 +323,90 @@ table.meta td.k{width:150px;color:var(--dim);letter-spacing:.12em;text-transform
   });
   document.getElementById("topBtn").addEventListener("click", function () {
     document.getElementById("index").scrollIntoView({ behavior: reduce ? "auto" : "smooth" });
+  });
+  var AC = null;
+  function blip() {
+    try {
+      AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+      if (AC.state === "suspended") AC.resume();
+      var o = AC.createOscillator(), g = AC.createGain(), tm = AC.currentTime;
+      o.type = "square"; o.frequency.value = 700 + Math.random() * 500;
+      g.gain.setValueAtTime(0.035, tm);
+      g.gain.exponentialRampToValueAtTime(0.0001, tm + 0.04);
+      o.connect(g); g.connect(AC.destination);
+      o.start(tm); o.stop(tm + 0.05);
+    } catch (e) {}
+  }
+  function mikiVoice() {
+    var vs = [];
+    try { vs = speechSynthesis.getVoices() || []; } catch (e) {}
+    var en = vs.filter(function (v) { return /^en/i.test(v.lang); });
+    if (!en.length) return null;
+    function score(v) {
+      var s = 0;
+      if (/samantha|victoria|karen|moira|tessa|fiona|serena|aria|jenny|emma|zira|susan|hazel|libby|maisie|sonia|clara|natasha|allison|michelle|ava|kate|olivia|emily|sophia|female|woman|girl/i.test(v.name)) s += 50;
+      if (/ryan|thomas|george|daniel|arthur|oliver|brian|james|william|liam|connor|david|mark|luke|roger|eric|andrew|christopher|edward|harry|fred|john|mike|blank|male|man|boy/i.test(v.name)) s -= 50;
+      if (/natural/i.test(v.name)) s += 8;
+      return s;
+    }
+    en.sort(function (a, b) { return score(b) - score(a); });
+    return en[0];
+  }
+  try { if ("onvoiceschanged" in speechSynthesis) speechSynthesis.onvoiceschanged = function () { mikiVoice(); }; } catch (e) {}
+  var talking = null, typer = null;
+  function hush() {
+    if (typer) { clearInterval(typer); typer = null; }
+    try { speechSynthesis.cancel(); } catch (e2) {}
+    if (talking) {
+      talking.querySelector(".mp").textContent = talking.dataset.full;
+      talking.classList.remove("talking");
+      talking = null;
+    }
+  }
+  Array.prototype.forEach.call(document.querySelectorAll(".miki"), function (box) {
+    var who = box.querySelector(".who");
+    var bits = [];
+    Array.prototype.slice.call(box.childNodes).forEach(function (n) {
+      if (n === who) return;
+      if (n.nodeType === 3) { if (n.textContent.trim()) bits.push(n.textContent.trim()); }
+      else bits.push(n.textContent);
+      box.removeChild(n);
+    });
+    var full = bits.join(" ");
+    var mp = document.createElement("span");
+    mp.className = "mp"; mp.textContent = full;
+    var cur = document.createElement("span");
+    cur.className = "cur";
+    box.appendChild(mp); box.appendChild(cur);
+    box.dataset.full = full;
+    var tap = document.createElement("span");
+    tap.className = "tap"; tap.textContent = " \u00b7 tap, she reads it";
+    who.appendChild(tap);
+    box.addEventListener("click", function () {
+      if (talking === box) { hush(); return; }
+      hush();
+      talking = box;
+      box.classList.add("talking");
+      var i = 0;
+      mp.textContent = "";
+      typer = setInterval(function () {
+        i++;
+        mp.textContent = full.slice(0, i);
+        if (i % 2 === 0) blip();
+        if (i >= full.length) { clearInterval(typer); typer = null; }
+      }, 18);
+      try {
+        var u = new SpeechSynthesisUtterance(full);
+        var v = mikiVoice();
+        if (v) { u.voice = v; u.lang = v.lang; }
+        u.rate = 1.06; u.pitch = 1.25;
+        u.onend = u.onerror = function () {
+          if (talking === box) { box.classList.remove("talking"); talking = null; }
+          if (typer) { clearInterval(typer); typer = null; mp.textContent = full; }
+        };
+        speechSynthesis.speak(u);
+      } catch (e3) {}
+    });
   });
 })();
 </script>
